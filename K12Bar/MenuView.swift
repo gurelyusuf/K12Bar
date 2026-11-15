@@ -15,7 +15,7 @@ struct MenuView: View {
     @State private var saturation = 1.0
     @State private var hex = ""
 
-    private static let labelWidth: CGFloat = 72
+    private static let labelWidth: CGFloat = 80
     private static let swatches: [(name: String, hue: Double, saturation: Double)] = [
         ("Red", 0, 1), ("Orange", 0.08, 1), ("Yellow", 0.16, 1), ("Green", 0.33, 1), ("Cyan", 0.5, 1),
         ("Blue", 0.62, 1), ("Purple", 0.76, 1), ("Pink", 0.9, 1), ("White", 0, 0),
@@ -26,28 +26,27 @@ struct MenuView: View {
             header
             if let error = model.error {
                 Text(error)
-                    .font(.callout)
                     .foregroundStyle(.red)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            Picker("Section", selection: $tab) {
-                ForEach(Tab.allCases, id: \.self) { Text($0.rawValue).tag($0) }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .frame(maxWidth: .infinity)
+            Segments(label: "Section", selection: $tab, options: Tab.allCases.map { ($0.rawValue, $0) })
             switch tab {
             case .lighting: lighting
             case .keys: keys
             }
             Divider()
             HStack {
-                Toggle("Launch at login", isOn: Binding(get: { model.launchesAtLogin }, set: model.setLaunchesAtLogin))
+                Text("Launch at login")
                 Spacer()
-                Button("Quit") { NSApplication.shared.terminate(nil) }
+                Toggle("Launch at login", isOn: Binding(get: { model.launchesAtLogin }, set: model.setLaunchesAtLogin))
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
             }
-            .controlSize(.small)
+            Button("Quit K12Bar") { NSApplication.shared.terminate(nil) }
+                .frame(maxWidth: .infinity, alignment: .trailing)
         }
+        .font(.body)
         .padding(16)
         .frame(width: 320)
         .onAppear(perform: syncColor)
@@ -59,7 +58,7 @@ struct MenuView: View {
     private var header: some View {
         HStack(alignment: .center, spacing: 8) {
             VStack(alignment: .leading, spacing: 1) {
-                Text("Keychron K12").font(.title3.weight(.semibold))
+                Text("Keychron K12").font(.headline)
                 Text(model.transport.map { "Connected · \($0.rawValue)" } ?? "Not connected")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -89,7 +88,7 @@ struct MenuView: View {
     private func row<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
         HStack(spacing: 8) {
             Text(label).frame(width: Self.labelWidth, alignment: .leading)
-            content().frame(maxWidth: .infinity, alignment: .leading)
+            content().frame(maxWidth: .infinity, alignment: .trailing)
         }
     }
 
@@ -104,7 +103,7 @@ struct MenuView: View {
 
     private func note(_ text: String) -> some View {
         Text(text)
-            .font(.callout)
+            .font(.subheadline)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
     }
@@ -124,22 +123,33 @@ struct MenuView: View {
                 .controlSize(.small)
             }
             row("Effect") {
-                Picker("Effect", selection: $model.lighting.mode) {
-                    ForEach(Array(K12Protocol.Effect.modes), id: \.self) { mode in
-                        Text(K12Protocol.Effect.name(of: mode)).tag(mode)
+                Menu {
+                    Picker("Effect", selection: $model.lighting.mode) {
+                        ForEach(Array(K12Protocol.Effect.modes), id: \.self) { mode in
+                            Text(K12Protocol.Effect.name(of: mode)).tag(mode)
+                        }
                     }
+                    .pickerStyle(.inline)
+                    .labelsHidden()
+                } label: {
+                    HStack {
+                        Text(K12Protocol.Effect.name(of: model.lighting.mode))
+                        Spacer()
+                        Image(systemName: "chevron.up.chevron.down").font(.caption).foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, 8)
+                    .frame(height: Segments<Int>.height)
+                    .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+                    .contentShape(Rectangle())
                 }
-                .labelsHidden()
-                .fixedSize()
+                .buttonStyle(.plain)
+                .menuIndicator(.hidden)
+                .accessibilityLabel("Effect")
+                .accessibilityValue(K12Protocol.Effect.name(of: model.lighting.mode))
             }
             if model.lighting.usesColor {
                 row("Color") {
-                    Picker("Color", selection: $model.lighting.fullColor) {
-                        Text("Single").tag(false)
-                        Text("Rainbow").tag(true)
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.segmented)
+                    Segments(label: "Color", selection: $model.lighting.fullColor, options: [("Single", false), ("Rainbow", true)])
                 }
                 if !model.lighting.fullColor { colorPicker }
             }
@@ -149,12 +159,7 @@ struct MenuView: View {
             }
             if model.lighting.hasDirection {
                 row("Direction") {
-                    Picker("Direction", selection: $model.lighting.direction) {
-                        Text("Forward").tag(UInt8(0))
-                        Text("Reverse").tag(UInt8(1))
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.segmented)
+                    Segments(label: "Direction", selection: $model.lighting.direction, options: [("Forward", 0), ("Reverse", 1)])
                 }
             }
             Divider()
@@ -191,9 +196,9 @@ struct MenuView: View {
                     Spacer(minLength: 0)
                 }
                 TextField("Hex", text: $hex)
-                    .font(.callout.monospaced())
+                    .font(.body.monospaced())
                     .textFieldStyle(.roundedBorder)
-                    .frame(width: 66)
+                    .frame(width: 72)
                     .onSubmit(applyHex)
                     .help("RGB as six hex digits, for example FF8800")
             }
@@ -250,7 +255,6 @@ struct MenuView: View {
                 Button("Save Current Lighting as Preset", systemImage: "plus") { addingPreset.toggle() }
                     .labelStyle(.iconOnly)
             }
-            .controlSize(.small)
           }
         }
         if addingPreset {
@@ -261,7 +265,6 @@ struct MenuView: View {
                 Button("Save", action: savePreset)
                     .disabled(presetName.trimmingCharacters(in: .whitespaces).isEmpty)
             }
-            .controlSize(.small)
         }
     }
 
@@ -301,7 +304,6 @@ struct MenuView: View {
                 Button("Remove All") { model.remaps = [] }
             }
         }
-        .controlSize(.small)
         Divider()
         Text("On the keyboard").font(.headline)
         Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 6) {
@@ -313,7 +315,6 @@ struct MenuView: View {
             shortcut("Disable auto sleep", "fn2 + S + O, hold 4 s")
             shortcut("Factory reset", "fn1 + J + Z, hold 3 s")
         }
-        .font(.callout)
     }
 
     private func keyPicker(_ usage: Binding<Int>) -> some View {
@@ -331,6 +332,37 @@ struct MenuView: View {
             Text(name)
             Text(keys).foregroundStyle(.secondary).gridColumnAlignment(.trailing)
         }
+    }
+}
+
+/// A full-width segmented control, so every choice in the menu has the same width and height.
+private struct Segments<Value: Hashable>: View {
+    static var height: CGFloat { 26 }
+
+    let label: String
+    @Binding var selection: Value
+    let options: [(title: String, value: Value)]
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(options, id: \.value) { option in
+                let selected = option.value == selection
+                Button { selection = option.value } label: {
+                    Text(option.title)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: Self.height - 4)
+                        .background(selected ? AnyShapeStyle(.background) : AnyShapeStyle(.clear), in: RoundedRectangle(cornerRadius: 5))
+                        .shadow(color: .black.opacity(selected ? 0.2 : 0), radius: 1, y: 0.5)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(selected ? .isSelected : [])
+            }
+        }
+        .padding(2)
+        .background(.quaternary, in: RoundedRectangle(cornerRadius: 7))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(label)
     }
 }
 
