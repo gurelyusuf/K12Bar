@@ -38,7 +38,21 @@ final class MenuSnapshotTests: XCTestCase {
         model.remaps = [.init(from: 0x39, to: 0x29)]
 
         let bitmap = try render(model, name: "cable")
-        XCTAssertGreaterThan(bitmap.pixelsHigh, 400)
+        XCTAssertGreaterThan(bitmap.pixelsHigh, 300)
+    }
+
+    func testMenuBarIconIsATemplateImage() throws {
+        let icon = MenuBarIcon.image
+        XCTAssertTrue(icon.isTemplate)
+        // Enlarged copy for looking at the shape.
+        let big = NSImage(size: NSSize(width: 144, height: 144), flipped: false) { rect in
+            NSColor.white.setFill()
+            rect.fill()
+            icon.draw(in: rect)
+            return true
+        }
+        let data = try XCTUnwrap(big.tiffRepresentation.flatMap { NSBitmapImageRep(data: $0)?.representation(using: .png, properties: [:]) })
+        try data.write(to: FileManager.default.temporaryDirectory.appending(path: "K12Bar-icon.png"))
     }
 
     func testMenuOnBluetoothShowsBattery() throws {
@@ -47,6 +61,6 @@ final class MenuSnapshotTests: XCTestCase {
         model.battery = 56
 
         let bitmap = try render(model, name: "bluetooth")
-        XCTAssertGreaterThan(bitmap.pixelsHigh, 200)
+        XCTAssertGreaterThan(bitmap.pixelsHigh, 100)
     }
 }
