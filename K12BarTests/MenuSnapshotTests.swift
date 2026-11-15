@@ -45,7 +45,7 @@ final class MenuSnapshotTests: XCTestCase {
         let icon = MenuBarIcon.image
         XCTAssertTrue(icon.isTemplate)
         // Enlarged copy for looking at the shape.
-        let big = NSImage(size: NSSize(width: 144, height: 144), flipped: false) { rect in
+        let big = NSImage(size: NSSize(width: 176, height: 144), flipped: false) { rect in
             NSColor.white.setFill()
             rect.fill()
             icon.draw(in: rect)
