@@ -24,9 +24,12 @@ final class KeyboardModel {
         var effect: K12Protocol.Effect
     }
 
-    /// Lighting being edited in the menu; sent to the keyboard by `applyLighting()`.
+    /// Lighting shown in the menu; every change is written to the keyboard shortly after.
     /// The keyboard cannot report lighting changed with its own keys, so this starts from the last host write.
-    var lighting = K12Protocol.Effect(mode: 1, red: 255, green: 255, blue: 255, fullColor: false, brightness: 16, speed: 8, direction: 0)
+    var lighting = K12Protocol.Effect(mode: 1, red: 255, green: 255, blue: 255, fullColor: false, brightness: 16, speed: 8, direction: 0) {
+        didSet { if lighting != oldValue { scheduleApply() } }
+    }
+    private var pendingApply: DispatchWorkItem?
     var presets: [Preset] {
         didSet { UserDefaults.standard.set(try? JSONEncoder().encode(presets), forKey: Self.presetsKey) }
     }
@@ -101,9 +104,19 @@ final class KeyboardModel {
         }
     }
 
-    /// Writes `lighting` to the keyboard's flash. The keyboard shows it immediately and keeps it.
-    func applyLighting() {
-        guard let zone = ledZone, let updated = K12Protocol.zone(zone, settingActiveEffect: lighting) else { return }
+    /// Every write is a flash write cycle, so a drag on a slider or the color wheel becomes one write
+    /// once the value has been still for a moment.
+    private func scheduleApply() {
+        pendingApply?.cancel()
+        let apply = DispatchWorkItem { [weak self] in self?.applyLighting() }
+        pendingApply = apply
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: apply)
+    }
+
+    /// Writes `lighting` to the keyboard's flash unless the keyboard already holds it.
+    private func applyLighting() {
+        guard let zone = ledZone, K12Protocol.activeEffect(inZone: zone) != lighting,
+              let updated = K12Protocol.zone(zone, settingActiveEffect: lighting) else { return }
         do {
             try session.writeLEDZone(updated)
             ledZone = updated
@@ -122,7 +135,6 @@ final class KeyboardModel {
 
     func apply(_ preset: Preset) {
         lighting = preset.effect
-        applyLighting()
     }
 
     /// Keeps the first LED zone ever read, so the factory lighting data can be restored.

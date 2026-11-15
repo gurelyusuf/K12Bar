@@ -23,7 +23,7 @@ Auto sleep, factory reset and the fn layers exist only as key combinations in th
 
 ## How lighting is written
 
-`K12Session.writeLEDZone` rewrites the 18 page LED zone in the keyboard's flash (`0x9340` to `0x97bf`) and then saves the settings. Only the first 12 bytes of the last page change; the rest is sent back as read. Each "Apply to keyboard" is one flash write cycle, so the app writes only on that button, not while dragging sliders.
+`K12Session.writeLEDZone` rewrites the 18 page LED zone in the keyboard's flash (`0x9340` to `0x97bf`) and then saves the settings. Only the first 12 bytes of the last page change; the rest is sent back as read. Each write is one flash write cycle, so changes are applied 0.4 s after the last edit: dragging a slider or the color wheel results in a single write.
 
 Things the firmware does that the code relies on (found by reverse engineering, see comments in `K12Session.swift` and `K12Protocol.swift`):
 

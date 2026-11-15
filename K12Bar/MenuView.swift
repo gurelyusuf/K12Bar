@@ -43,7 +43,6 @@ struct MenuView: View {
                 get: { model.lighting.direction == 1 },
                 set: { model.lighting.direction = $0 ? 1 : 0 }
             ))
-            Button("Apply to keyboard") { model.applyLighting() }
             presets
         } else {
             Text(model.transport == .bluetooth
