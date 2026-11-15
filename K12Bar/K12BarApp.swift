@@ -18,11 +18,11 @@ struct K12BarApp: App {
 }
 
 /// The menu bar icon: a compact keyboard with its keys cut out.
-/// A template image, so macOS tints it for light and dark menu bars.
+/// Drawn in orange, so it is not a template image: macOS shows it in this color on every menu bar.
 enum MenuBarIcon {
     static let image: NSImage = {
         let image = NSImage(size: NSSize(width: 22, height: 18), flipped: false) { _ in
-            NSColor.black.set()
+            NSColor.systemOrange.set()
 
             // Keyboard body.
             let body = NSRect(x: 1, y: 3.5, width: 20, height: 11)
@@ -43,7 +43,6 @@ enum MenuBarIcon {
             }
             return true
         }
-        image.isTemplate = true
         image.accessibilityDescription = "K12Bar"
         return image
     }()

@@ -41,9 +41,9 @@ final class MenuSnapshotTests: XCTestCase {
         XCTAssertGreaterThan(bitmap.pixelsHigh, 300)
     }
 
-    func testMenuBarIconIsATemplateImage() throws {
+    func testMenuBarIconKeepsItsOwnColor() throws {
         let icon = MenuBarIcon.image
-        XCTAssertTrue(icon.isTemplate)
+        XCTAssertFalse(icon.isTemplate)
         // Enlarged copy for looking at the shape.
         let big = NSImage(size: NSSize(width: 176, height: 144), flipped: false) { rect in
             NSColor.white.setFill()
