@@ -69,7 +69,11 @@ final class HIDTransport {
         return name.hasPrefix("Bluetooth") ? .bluetooth : name == "USB" ? .usb : nil
     }
 
-    /// The keyboard only pushes the battery report when the level changes, so ask once on connect.
+    func refreshBattery() {
+        devices.filter { transport(of: $0) == .bluetooth }.forEach(pollBattery)
+    }
+
+    /// Whether the keyboard pushes battery reports on its own is unverified, so the level is polled.
     private func pollBattery(_ device: IOHIDDevice) {
         var buffer = [UInt8](repeating: 0, count: 8)
         var length = buffer.count
