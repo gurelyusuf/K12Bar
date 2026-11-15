@@ -1,10 +1,12 @@
 import Foundation
 
 /// Keychron "Game Keyboard Communication Protocol": 64 byte HID feature reports (report ID 0) over USB.
-/// Layouts below were taken from USB captures of a K3 v2, not from the vendor PDF, which differs in places.
+/// Checked against the K12 V1.16 firmware and USB captures of a K3 v2; the vendor PDF differs in places.
 enum K12Protocol {
     static let pageSize = 64
-    /// The LED zone is always transferred whole: 32 effect slots, per-key colors, then the active effect.
+    /// The LED zone is always transferred whole: 8 pages of effect slots the firmware never reads,
+    /// 9 pages of per-key colors, then one page starting with the effect to apply.
+    /// The count must be exact: the firmware accepts 20 pages (overwriting macros) and treats 0 as 256.
     static let ledZonePages = 18
     /// Offset of the active effect unit inside the LED zone (first bytes of the last page).
     static let activeEffectOffset = (ledZonePages - 1) * pageSize
@@ -14,8 +16,7 @@ enum K12Protocol {
         case readInfo = 0x05
         case readLED = 0x12
         case writeLED = 0x13
-        case startCustomization = 0x18
-        case stopCustomization = 0x19
+        /// Saves the applied lighting to the keyboard's settings page.
         case effectStart = 0xF0
     }
 
@@ -44,10 +45,12 @@ enum K12Protocol {
         return response[4...7].reversed().reduce(UInt32(0)) { $0 << 8 | UInt32($1) }
     }
 
-    /// One 16 byte lighting effect unit.
-    struct Effect: Equatable {
-        static let size = 16
-        static let customMode: UInt8 = 0x80
+    /// The lighting effect unit at the start of the last LED zone page.
+    /// The firmware reads bytes 0...3 and 8...11 of it and ignores the rest of the page.
+    struct Effect: Equatable, Codable {
+        static let size = 12
+        /// The light key cycles through effects 1...19.
+        static let modes: ClosedRange<UInt8> = 1...19
 
         var mode: UInt8
         var red: UInt8
@@ -55,11 +58,11 @@ enum K12Protocol {
         var blue: UInt8
         /// Rainbow colors instead of `red`/`green`/`blue`.
         var fullColor: Bool
-        /// 1 (off) ... 16 (brightest).
+        /// 0 (off) ... 16 (brightest).
         var brightness: UInt8
         /// 1 ... 16.
         var speed: UInt8
-        /// 0/1 for horizontal effects, 2/3 for vertical ones.
+        /// 0 is the default direction, 1 reverses it.
         var direction: UInt8
 
         init(mode: UInt8, red: UInt8, green: UInt8, blue: UInt8, fullColor: Bool, brightness: UInt8, speed: UInt8, direction: UInt8) {
@@ -73,25 +76,24 @@ enum K12Protocol {
             self.direction = direction
         }
 
-        /// Fails when the unit does not end with the AA 55 marker.
         init?(bytes: [UInt8]) {
-            guard bytes.count == Self.size, bytes[14] == 0xAA, bytes[15] == 0x55 else { return nil }
+            guard bytes.count >= Self.size else { return nil }
             self.init(mode: bytes[0], red: bytes[1], green: bytes[2], blue: bytes[3], fullColor: bytes[8] == 1,
                       brightness: bytes[9], speed: bytes[10], direction: bytes[11])
         }
 
         var bytes: [UInt8] {
-            [mode, red, green, blue, 0, 0, 0, 0, fullColor ? 1 : 0, brightness, speed, direction, 0, 0, 0xAA, 0x55]
+            [mode, red, green, blue, 0, 0, 0, 0, fullColor ? 1 : 0, brightness, speed, direction]
         }
     }
 
-    /// The effect the keyboard is currently showing, read from a full LED zone.
+    /// The effect last written by a host. Lighting changed with the keyboard's own keys is not visible here.
     static func activeEffect(inZone zone: [UInt8]) -> Effect? {
         guard zone.count == ledZonePages * pageSize else { return nil }
         return Effect(bytes: Array(zone[activeEffectOffset..<activeEffectOffset + Effect.size]))
     }
 
-    /// Returns the zone with only the active effect replaced. Nil when the zone has the wrong size.
+    /// Returns the zone with only the effect bytes of the last page replaced. Nil when the zone has the wrong size.
     static func zone(_ zone: [UInt8], settingActiveEffect effect: Effect) -> [UInt8]? {
         guard zone.count == ledZonePages * pageSize else { return nil }
         var zone = zone

@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import ServiceManagement
+import os
 
 /// Keyboard state shown in the menu. All HID callbacks arrive on the main run loop.
 @Observable
@@ -17,6 +18,25 @@ final class KeyboardModel {
         }
     }
 
+    struct Preset: Codable, Identifiable {
+        var id = UUID()
+        var name: String
+        var effect: K12Protocol.Effect
+    }
+
+    /// Lighting being edited in the menu; sent to the keyboard by `applyLighting()`.
+    /// The keyboard cannot report lighting changed with its own keys, so this starts from the last host write.
+    var lighting = K12Protocol.Effect(mode: 1, red: 255, green: 255, blue: 255, fullColor: false, brightness: 16, speed: 8, direction: 0)
+    var presets: [Preset] {
+        didSet { UserDefaults.standard.set(try? JSONEncoder().encode(presets), forKey: Self.presetsKey) }
+    }
+    /// Last LED zone read from the keyboard; writes modify a copy of it. Nil unless connected by cable.
+    private var ledZone: [UInt8]?
+    var canControlLighting: Bool { ledZone != nil }
+
+    private static let presetsKey = "presets"
+
+    private let log = Logger(subsystem: "com.gurel.K12Bar", category: "model")
     private static let remapsKey = "remaps"
     private let hid = HIDTransport()
     private var lowBattery = LowBatteryAlert()
@@ -25,12 +45,15 @@ final class KeyboardModel {
     init() {
         let saved = UserDefaults.standard.data(forKey: Self.remapsKey)
         remaps = saved.flatMap { try? JSONDecoder().decode([KeyRemap.Pair].self, from: $0) } ?? []
+        let savedPresets = UserDefaults.standard.data(forKey: Self.presetsKey)
+        presets = savedPresets.flatMap { try? JSONDecoder().decode([Preset].self, from: $0) } ?? []
 
         hid.onTransportChange = { [weak self] transport in
             guard let self else { return }
             self.transport = transport
             if transport != .bluetooth { battery = nil }
             if transport != nil, !remaps.isEmpty { applyRemaps() }
+            if transport == .usb { loadLighting() } else { ledZone = nil }
         }
         hid.onBattery = { [weak self] level in
             guard let self else { return }
@@ -56,6 +79,57 @@ final class KeyboardModel {
             self.error = "Could not change launch at login: \(error.localizedDescription)"
         }
         launchesAtLogin = SMAppService.mainApp.status == .enabled
+    }
+
+    private var session: K12Session { K12Session(send: hid.sendFeature, receive: hid.receiveFeature) }
+
+    /// Reads the LED zone from the keyboard. Sends read commands only.
+    private func loadLighting() {
+        guard ledZone == nil, hid.hasFeatureChannel else { return }
+        do {
+            let zone = try session.read(.readLED, pages: K12Protocol.ledZonePages)
+            try backUp(zone)
+            ledZone = zone
+            if let stored = K12Protocol.activeEffect(inZone: zone), K12Protocol.Effect.modes.contains(stored.mode), stored.brightness > 0 {
+                lighting = stored
+            }
+        } catch {
+            log.error("lighting read failed: \(String(describing: error), privacy: .public)")
+            self.error = "Could not read the lighting data: \(error)"
+        }
+    }
+
+    /// Writes `lighting` to the keyboard's flash. The keyboard shows it immediately and keeps it.
+    func applyLighting() {
+        guard let zone = ledZone, let updated = K12Protocol.zone(zone, settingActiveEffect: lighting) else { return }
+        do {
+            try session.writeLEDZone(updated)
+            ledZone = updated
+            error = nil
+        } catch {
+            // A failed transfer can leave the firmware waiting for more pages; only a power cycle resets it.
+            ledZone = nil
+            log.error("lighting write failed: \(String(describing: error), privacy: .public)")
+            self.error = "Lighting was not applied (\(error)). Unplug the keyboard, plug it back in and try again."
+        }
+    }
+
+    func savePreset(named name: String) {
+        presets.append(Preset(name: name, effect: lighting))
+    }
+
+    func apply(_ preset: Preset) {
+        lighting = preset.effect
+        applyLighting()
+    }
+
+    /// Keeps the first LED zone ever read, so the factory lighting data can be restored.
+    private func backUp(_ zone: [UInt8]) throws {
+        let folder = URL.applicationSupportDirectory.appending(path: "K12Bar")
+        let file = folder.appending(path: "led-zone-backup.bin")
+        guard !FileManager.default.fileExists(atPath: file.path) else { return }
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try Data(zone).write(to: file)
     }
 
     private func applyRemaps() {

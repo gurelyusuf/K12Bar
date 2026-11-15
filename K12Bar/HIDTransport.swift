@@ -69,6 +69,33 @@ final class HIDTransport {
         return name.hasPrefix("Bluetooth") ? .bluetooth : name == "USB" ? .usb : nil
     }
 
+    enum ReportError: Error {
+        case noFeatureChannel
+        case failed(IOReturn)
+    }
+
+    /// USB interface 0 exposes one unnumbered 64 byte feature report: the lighting protocol channel.
+    private var featureDevice: IOHIDDevice? {
+        devices.first { (IOHIDDeviceGetProperty($0, kIOHIDMaxFeatureReportSizeKey as CFString) as? Int ?? 0) >= K12Protocol.pageSize }
+    }
+
+    var hasFeatureChannel: Bool { featureDevice != nil }
+
+    func sendFeature(_ bytes: [UInt8]) throws {
+        guard let device = featureDevice else { throw ReportError.noFeatureChannel }
+        let result = IOHIDDeviceSetReport(device, kIOHIDReportTypeFeature, 0, bytes, bytes.count)
+        guard result == kIOReturnSuccess else { throw ReportError.failed(result) }
+    }
+
+    func receiveFeature() throws -> [UInt8] {
+        guard let device = featureDevice else { throw ReportError.noFeatureChannel }
+        var buffer = [UInt8](repeating: 0, count: K12Protocol.pageSize)
+        var length = buffer.count
+        let result = IOHIDDeviceGetReport(device, kIOHIDReportTypeFeature, 0, &buffer, &length)
+        guard result == kIOReturnSuccess else { throw ReportError.failed(result) }
+        return Array(buffer[..<length])
+    }
+
     func refreshBattery() {
         devices.filter { transport(of: $0) == .bluetooth }.forEach(pollBattery)
     }

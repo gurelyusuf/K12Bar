@@ -31,23 +31,17 @@ final class K12ProtocolTests: XCTestCase {
     }
 
     func testEffectRoundTripsCapturedUnits() throws {
-        let staticRed = hex("01 ff 00 00 00 00 00 00 00 10 0c 00 00 00 aa 55")
-        let effect = try XCTUnwrap(K12Protocol.Effect(bytes: staticRed))
+        let staticRed = hex("01 ff 00 00 00 00 00 00 00 10 0c 00")
+        let effect = try XCTUnwrap(K12Protocol.Effect(bytes: staticRed + hex("00 00 aa 55")))
         XCTAssertEqual(effect, .init(mode: 1, red: 0xFF, green: 0, blue: 0, fullColor: false, brightness: 16, speed: 12, direction: 0))
         XCTAssertEqual(effect.bytes, staticRed)
 
-        let rainbowRolling = hex("0b 00 00 ff 00 00 00 00 01 10 01 00 00 00 aa 55")
+        let rainbowRolling = hex("0b 00 00 ff 00 00 00 00 01 10 01 00")
         let rolling = try XCTUnwrap(K12Protocol.Effect(bytes: rainbowRolling))
         XCTAssertTrue(rolling.fullColor)
         XCTAssertEqual(rolling.speed, 1)
         XCTAssertEqual(rolling.bytes, rainbowRolling)
 
-        let scrollingDown = hex("0a 00 00 ff 00 00 00 00 00 10 0c 03 00 00 aa 55")
-        XCTAssertEqual(K12Protocol.Effect(bytes: scrollingDown)?.direction, 3)
-    }
-
-    func testEffectRejectsBadInput() {
-        XCTAssertNil(K12Protocol.Effect(bytes: hex("01 ff 00 00 00 00 00 00 00 10 0c 00 00 00 00 00")))
         XCTAssertNil(K12Protocol.Effect(bytes: hex("01 ff 00")))
     }
 
@@ -58,7 +52,7 @@ final class K12ProtocolTests: XCTestCase {
 
         XCTAssertEqual(K12Protocol.activeEffect(inZone: zone), effect)
         XCTAssertEqual(Array(zone[..<K12Protocol.activeEffectOffset]), Array(original[..<K12Protocol.activeEffectOffset]))
-        XCTAssertEqual(Array(zone[(K12Protocol.activeEffectOffset + 16)...]), Array(original[(K12Protocol.activeEffectOffset + 16)...]))
+        XCTAssertEqual(Array(zone[(K12Protocol.activeEffectOffset + 12)...]), Array(original[(K12Protocol.activeEffectOffset + 12)...]))
         XCTAssertNil(K12Protocol.zone([0, 1, 2], settingActiveEffect: effect))
         XCTAssertNil(K12Protocol.activeEffect(inZone: [0, 1, 2]))
     }
