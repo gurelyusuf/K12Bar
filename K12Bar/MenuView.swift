@@ -165,7 +165,9 @@ struct MenuView: View {
             Divider()
             presets
         } else {
-            note(model.transport == .bluetooth
+            note(model.unsupportedFirmware
+                 ? "This keyboard's firmware is not supported. Lighting works with the K12 RGB firmware V1.16 only."
+                 : model.transport == .bluetooth
                  ? "Lighting can only be changed over the cable. Plug it in and switch the keyboard to Cable."
                  : "Connect the keyboard with the cable to change lighting.")
         }

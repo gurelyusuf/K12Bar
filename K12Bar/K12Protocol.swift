@@ -8,6 +8,10 @@ enum K12Protocol {
     /// 9 pages of per-key colors, then one page starting with the effect to apply.
     /// The count must be exact: the firmware accepts 20 pages (overwriting macros) and treats 0 as 256.
     static let ledZonePages = 18
+    /// Bytes 4...9 of the device info: USB vendor 05AC, product 024F, firmware V1.16.
+    /// The LED zone layout and write rules were only verified for this firmware.
+    static let supportedDeviceInfo: [UInt8] = [0xAC, 0x05, 0x4F, 0x02, 0x16, 0x01]
+
     /// Offset of the active effect unit inside the LED zone (first bytes of the last page).
     static let activeEffectOffset = (ledZonePages - 1) * pageSize
 

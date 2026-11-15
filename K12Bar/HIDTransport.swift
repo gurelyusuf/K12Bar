@@ -3,7 +3,8 @@ import IOKit.hid
 import os
 
 /// Finds the Keychron K12 and reads its HID reports.
-/// The keyboard presents itself as Apple 05AC:024F on both USB and Bluetooth.
+/// The keyboard presents itself as Apple 05AC:024F on both USB and Bluetooth. Real Apple keyboards
+/// and other Keychron models use the same IDs, so devices are also checked by product name.
 final class HIDTransport {
     enum Transport: String {
         case usb = "USB"
@@ -51,7 +52,10 @@ final class HIDTransport {
         guard result == kIOReturnSuccess else { throw StartError.openFailed(result) }
     }
 
+    static let productName = "Keychron K12"
+
     private func attached(_ device: IOHIDDevice) {
+        guard IOHIDDeviceGetProperty(device, kIOHIDProductKey as CFString) as? String == Self.productName else { return }
         devices.append(device)
         let transport = transport(of: device)
         log.info("attached over \(transport?.rawValue ?? "unknown transport", privacy: .public)")

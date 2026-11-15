@@ -1,0 +1,11 @@
+// Ad-hoc signing, so the project builds on any Mac without an Apple developer account.
+// An ad-hoc signed build asks for Input Monitoring again after every rebuild. To avoid that,
+// create Config/Local.xcconfig (ignored by git) with your own team, for example:
+//   CODE_SIGN_STYLE = Automatic
+//   CODE_SIGN_IDENTITY = Apple Development
+//   DEVELOPMENT_TEAM = ABCDE12345
+CODE_SIGN_STYLE = Manual
+CODE_SIGN_IDENTITY = -
+DEVELOPMENT_TEAM =
+
+#include? "Local.xcconfig"

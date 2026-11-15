@@ -45,7 +45,7 @@ enum KeyRemap {
         let output = Pipe()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/hidutil")
         process.arguments = [
-            "property", "--matching", #"{"VendorID":1452,"ProductID":591}"#,
+            "property", "--matching", #"{"VendorID":1452,"ProductID":591,"Product":"\#(HIDTransport.productName)"}"#,
             "--set", try hidutilProperty(for: pairs),
         ]
         process.standardOutput = output

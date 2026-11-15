@@ -36,6 +36,8 @@ final class KeyboardModel {
     /// Last LED zone read from the keyboard; writes modify a copy of it. Nil unless connected by cable.
     var ledZone: [UInt8]?
     var canControlLighting: Bool { ledZone != nil }
+    /// True when a cable-connected keyboard runs a firmware other than the one this app can write to.
+    private(set) var unsupportedFirmware = false
 
     private static let presetsKey = "presets"
 
@@ -63,7 +65,7 @@ final class KeyboardModel {
             self.transport = transport
             if transport != .bluetooth { battery = nil }
             if transport != nil, !remaps.isEmpty { applyRemaps() }
-            if transport == .usb { loadLighting() } else { ledZone = nil }
+            if transport == .usb { loadLighting() } else { ledZone = nil; unsupportedFirmware = false }
         }
         hid.onBattery = { [weak self] level in
             guard let self else { return }
@@ -98,6 +100,9 @@ final class KeyboardModel {
     private func loadLighting() {
         guard ledZone == nil, hid.hasFeatureChannel else { return }
         do {
+            let info = try session.read(.readInfo, pages: 2)
+            unsupportedFirmware = Array(info[4...9]) != K12Protocol.supportedDeviceInfo
+            guard !unsupportedFirmware else { return }
             let zone = try session.read(.readLED, pages: K12Protocol.ledZonePages)
             try backUp(zone)
             ledZone = zone
