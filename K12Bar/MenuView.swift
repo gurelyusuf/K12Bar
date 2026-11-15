@@ -40,6 +40,13 @@ struct MenuView: View {
             case .lighting: lighting
             case .keys: keys
             }
+            Divider()
+            HStack {
+                Toggle("Launch at login", isOn: Binding(get: { model.launchesAtLogin }, set: model.setLaunchesAtLogin))
+                Spacer()
+                Button("Quit") { NSApplication.shared.terminate(nil) }
+            }
+            .controlSize(.small)
         }
         .padding(16)
         .frame(width: 320)
@@ -63,17 +70,6 @@ struct MenuView: View {
                     .font(.body.monospacedDigit())
                     .foregroundStyle(level <= LowBatteryAlert.threshold ? .red : .secondary)
             }
-            Menu {
-                Toggle("Launch at Login", isOn: Binding(get: { model.launchesAtLogin }, set: model.setLaunchesAtLogin))
-                Divider()
-                Button("Quit K12Bar") { NSApplication.shared.terminate(nil) }
-            } label: {
-                Image(systemName: "ellipsis.circle").font(.title3)
-            }
-            .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
-            .fixedSize()
-            .accessibilityLabel("Options")
         }
     }
 
@@ -97,15 +93,10 @@ struct MenuView: View {
         }
     }
 
-    /// A slider with a symbol at each end, like the system brightness and volume sliders.
-    private func levelRow(_ label: String, value: Binding<UInt8>, range: ClosedRange<Double>, low: String, high: String) -> some View {
+    private func levelRow(_ label: String, value: Binding<UInt8>, range: ClosedRange<Double>) -> some View {
         row(label) {
             Slider(value: Binding(get: { Double(value.wrappedValue) }, set: { value.wrappedValue = UInt8($0.rounded()) }), in: range) {
                 Text(label)
-            } minimumValueLabel: {
-                Image(systemName: low).foregroundStyle(.secondary).frame(width: 22)
-            } maximumValueLabel: {
-                Image(systemName: high).foregroundStyle(.secondary).frame(width: 22)
             }
             .labelsHidden()
         }
@@ -123,8 +114,6 @@ struct MenuView: View {
     @ViewBuilder
     private var lighting: some View {
         if model.canControlLighting {
-            KeyboardPreview(effect: model.lighting)
-                .frame(height: 84)
             row("Backlight") {
                 Toggle("Backlight", isOn: Binding(
                     get: { model.lighting.brightness > 0 },
@@ -154,9 +143,9 @@ struct MenuView: View {
                 }
                 if !model.lighting.fullColor { colorPicker }
             }
-            levelRow("Brightness", value: $model.lighting.brightness, range: 0...16, low: "sun.min", high: "sun.max")
+            levelRow("Brightness", value: $model.lighting.brightness, range: 0...16)
             if model.lighting.hasSpeed {
-                levelRow("Speed", value: $model.lighting.speed, range: 1...16, low: "tortoise", high: "hare")
+                levelRow("Speed", value: $model.lighting.speed, range: 1...16)
             }
             if model.lighting.hasDirection {
                 row("Direction") {
@@ -382,45 +371,5 @@ private struct SpectrumPad: View {
             hue = min(max(hue + (direction == .increment ? 0.03 : -0.03), 0), 1)
             onChange()
         }
-    }
-}
-
-/// A small picture of the keyboard lit the way the current settings will light it.
-private struct KeyboardPreview: View {
-    let effect: K12Protocol.Effect
-
-    /// Key widths per row in key units; every row is 15 units wide like the K12's 60% layout.
-    private static let rows: [[Double]] = [
-        Array(repeating: 1, count: 13) + [2],
-        [1.5] + Array(repeating: 1, count: 12) + [1.5],
-        [1.75] + Array(repeating: 1, count: 11) + [2.25],
-        [2.25] + Array(repeating: 1, count: 10) + [2.75],
-        [1.25, 1.25, 1.25, 6.25, 1.25, 1.25, 1.25, 1.25],
-    ]
-
-    var body: some View {
-        Canvas { context, size in
-            let inset = 6.0
-            let unit = (size.width - inset * 2) / 15
-            let rowHeight = (size.height - inset * 2) / Double(Self.rows.count)
-            let level = Double(effect.brightness) / 16
-            for (rowIndex, row) in Self.rows.enumerated() {
-                var x = inset
-                for width in row {
-                    let rect = CGRect(x: x + 1, y: inset + Double(rowIndex) * rowHeight + 1, width: width * unit - 2, height: rowHeight - 2)
-                    let middle = (x + width * unit / 2) / size.width
-                    context.fill(Path(roundedRect: rect, cornerRadius: 2.5), with: .color(color(at: middle).opacity(0.15 + 0.85 * level)))
-                    x += width * unit
-                }
-            }
-        }
-        .background(.black.opacity(0.85), in: RoundedRectangle(cornerRadius: 8))
-        .accessibilityHidden(true)
-    }
-
-    private func color(at position: Double) -> Color {
-        if effect.brightness == 0 { return .gray }
-        if effect.fullColor || !effect.usesColor { return Color(hue: position, saturation: 0.9, brightness: 1) }
-        return Color(red: Double(effect.red) / 255, green: Double(effect.green) / 255, blue: Double(effect.blue) / 255)
     }
 }
