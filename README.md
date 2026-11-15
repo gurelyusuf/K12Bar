@@ -12,12 +12,11 @@ Requires macOS 14 or later.
 
 1. Download `K12Bar.zip` from the [latest release](https://github.com/gurelyusuf/K12Bar/releases/latest) and unzip it.
 2. Drag `K12Bar.app` into Applications and open it.
-3. The app is not notarized by Apple, so macOS blocks the first launch. Open System Settings > Privacy & Security, scroll down and click **Open Anyway**.
-4. Allow K12Bar under Privacy & Security > Input Monitoring, then open it again.
+3. Allow K12Bar under System Settings > Privacy & Security > Input Monitoring, then open it again.
 
 ### Build from source
 
-Needs Xcode. A locally built app is not blocked by macOS.
+Needs Xcode.
 
 ```sh
 git clone https://github.com/gurelyusuf/K12Bar.git
