@@ -60,6 +60,8 @@ final class KeyboardModel {
             battery = level
             if lowBattery.shouldAlert(level: level) { LowBatteryAlert.notify(level: level) }
         }
+        // Unit tests are hosted by the app; they must never talk to the real keyboard.
+        guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else { return }
         do {
             try hid.start()
         } catch HIDTransport.StartError.inputMonitoringDenied {
