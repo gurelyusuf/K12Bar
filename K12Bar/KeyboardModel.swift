@@ -6,14 +6,14 @@ import os
 /// Keyboard state shown in the menu. All HID callbacks arrive on the main run loop.
 @Observable
 final class KeyboardModel {
-    private(set) var transport: HIDTransport.Transport?
-    private(set) var battery: Int?
+    var transport: HIDTransport.Transport?
+    var battery: Int?
     private(set) var error: String?
     private(set) var launchesAtLogin = SMAppService.mainApp.status == .enabled
 
     var remaps: [KeyRemap.Pair] {
         didSet {
-            UserDefaults.standard.set(try? JSONEncoder().encode(remaps), forKey: Self.remapsKey)
+            defaults.set(try? JSONEncoder().encode(remaps), forKey: Self.remapsKey)
             applyRemaps()
         }
     }
@@ -31,10 +31,10 @@ final class KeyboardModel {
     }
     private var pendingApply: DispatchWorkItem?
     var presets: [Preset] {
-        didSet { UserDefaults.standard.set(try? JSONEncoder().encode(presets), forKey: Self.presetsKey) }
+        didSet { defaults.set(try? JSONEncoder().encode(presets), forKey: Self.presetsKey) }
     }
     /// Last LED zone read from the keyboard; writes modify a copy of it. Nil unless connected by cable.
-    private var ledZone: [UInt8]?
+    var ledZone: [UInt8]?
     var canControlLighting: Bool { ledZone != nil }
 
     private static let presetsKey = "presets"
@@ -45,10 +45,17 @@ final class KeyboardModel {
     private var lowBattery = LowBatteryAlert()
     private var batteryTimer: Timer?
 
-    init() {
-        let saved = UserDefaults.standard.data(forKey: Self.remapsKey)
+    private let defaults: UserDefaults
+    /// False in unit tests, which are hosted by the app and must never touch the keyboard or `hidutil`.
+    private let live: Bool
+
+    init(defaults: UserDefaults = .standard,
+         live: Bool = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil) {
+        self.defaults = defaults
+        self.live = live
+        let saved = defaults.data(forKey: Self.remapsKey)
         remaps = saved.flatMap { try? JSONDecoder().decode([KeyRemap.Pair].self, from: $0) } ?? []
-        let savedPresets = UserDefaults.standard.data(forKey: Self.presetsKey)
+        let savedPresets = defaults.data(forKey: Self.presetsKey)
         presets = savedPresets.flatMap { try? JSONDecoder().decode([Preset].self, from: $0) } ?? []
 
         hid.onTransportChange = { [weak self] transport in
@@ -63,8 +70,7 @@ final class KeyboardModel {
             battery = level
             if lowBattery.shouldAlert(level: level) { LowBatteryAlert.notify(level: level) }
         }
-        // Unit tests are hosted by the app; they must never talk to the real keyboard.
-        guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else { return }
+        guard live else { return }
         do {
             try hid.start()
         } catch HIDTransport.StartError.inputMonitoringDenied {
@@ -115,7 +121,7 @@ final class KeyboardModel {
 
     /// Writes `lighting` to the keyboard's flash unless the keyboard already holds it.
     private func applyLighting() {
-        guard let zone = ledZone, K12Protocol.activeEffect(inZone: zone) != lighting,
+        guard live, let zone = ledZone, K12Protocol.activeEffect(inZone: zone) != lighting,
               let updated = K12Protocol.zone(zone, settingActiveEffect: lighting) else { return }
         do {
             try session.writeLEDZone(updated)
@@ -147,7 +153,7 @@ final class KeyboardModel {
     }
 
     private func applyRemaps() {
-        guard transport != nil else { return }
+        guard live, transport != nil else { return }
         do {
             try KeyRemap.apply(remaps)
         } catch {

@@ -40,7 +40,7 @@ Input Monitoring (System Settings > Privacy & Security): macOS requires it to op
 ## Limits
 
 - The keyboard is matched by USB IDs `05AC:024F`, which it borrows from Apple. A real Apple aluminium keyboard has the same IDs.
-- Effects are numbered 1 to 19 in the order of the keyboard's light key; the firmware has no names for them.
+- Effect names come from the vendor Windows software for this firmware family. Five were matched to mode numbers in USB captures of a K3 v2; that the K12 uses the same order is an assumption.
 - Only the K12 RGB firmware V1.16 was analysed and tested.
 
 ## Build

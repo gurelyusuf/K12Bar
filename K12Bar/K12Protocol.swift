@@ -51,6 +51,19 @@ enum K12Protocol {
         static let size = 12
         /// The light key cycles through effects 1...19.
         static let modes: ClosedRange<UInt8> = 1...19
+        /// Names from the vendor's Windows software for this firmware family, in mode order.
+        /// Five of them were matched to mode numbers in USB captures of a K3 v2; the K12 order is assumed equal.
+        static let names = [
+            "Static", "Single On", "Single Off", "Glittering", "Falling", "Colourful", "Breath", "Spectrum", "Outward",
+            "Scrolling", "Rolling", "Rotating", "Explode", "Launch", "Ripples", "Flowing", "Pulsating", "Tilt", "Shuttle",
+        ]
+        static func name(of mode: UInt8) -> String {
+            modes.contains(mode) ? names[Int(mode) - 1] : "Effect \(mode)"
+        }
+        /// Per the vendor spec: Colourful and Spectrum always use rainbow colors.
+        var usesColor: Bool { mode != 6 && mode != 8 }
+        var hasSpeed: Bool { mode != 1 }
+        var hasDirection: Bool { [10, 11, 12, 16, 18, 19].contains(mode) }
 
         var mode: UInt8
         var red: UInt8
