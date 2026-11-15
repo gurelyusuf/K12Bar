@@ -36,7 +36,7 @@ struct MenuView: View {
                 }
             }
             Toggle("Rainbow colors", isOn: $model.lighting.fullColor)
-            ColorPicker("Color", selection: color, supportsOpacity: false).disabled(model.lighting.fullColor)
+            colorControl.disabled(model.lighting.fullColor)
             slider("Brightness", value: $model.lighting.brightness, range: 0...16)
             slider("Speed", value: $model.lighting.speed, range: 1...16)
             Toggle("Reverse direction", isOn: Binding(
@@ -76,18 +76,39 @@ struct MenuView: View {
         }
     }
 
-    private var color: Binding<Color> {
+    /// A hue slider instead of the system color panel, which does not work from a menu bar window.
+    private var colorControl: some View {
+        HStack {
+            Text("Color")
+            Slider(value: hue, in: 0...1)
+                .background(
+                    LinearGradient(colors: stride(from: 0.0, through: 1.0, by: 0.125).map { Color(hue: $0, saturation: 1, brightness: 1) },
+                                   startPoint: .leading, endPoint: .trailing)
+                        .frame(height: 4)
+                        .clipShape(Capsule())
+                )
+            Button("White") { setColor(.white) }
+            Circle()
+                .fill(Color(red: Double(model.lighting.red) / 255, green: Double(model.lighting.green) / 255, blue: Double(model.lighting.blue) / 255))
+                .frame(width: 14, height: 14)
+        }
+    }
+
+    private var hue: Binding<Double> {
         Binding(
             get: {
-                Color(red: Double(model.lighting.red) / 255, green: Double(model.lighting.green) / 255, blue: Double(model.lighting.blue) / 255)
+                NSColor(srgbRed: CGFloat(model.lighting.red) / 255, green: CGFloat(model.lighting.green) / 255,
+                        blue: CGFloat(model.lighting.blue) / 255, alpha: 1).hueComponent
             },
-            set: { newValue in
-                guard let rgb = NSColor(newValue).usingColorSpace(.sRGB) else { return }
-                model.lighting.red = UInt8((rgb.redComponent * 255).rounded())
-                model.lighting.green = UInt8((rgb.greenComponent * 255).rounded())
-                model.lighting.blue = UInt8((rgb.blueComponent * 255).rounded())
-            }
+            set: { setColor(NSColor(hue: $0, saturation: 1, brightness: 1, alpha: 1)) }
         )
+    }
+
+    private func setColor(_ color: NSColor) {
+        guard let rgb = color.usingColorSpace(.sRGB) else { return }
+        model.lighting.red = UInt8((rgb.redComponent * 255).rounded())
+        model.lighting.green = UInt8((rgb.greenComponent * 255).rounded())
+        model.lighting.blue = UInt8((rgb.blueComponent * 255).rounded())
     }
 
     private func slider(_ title: String, value: Binding<UInt8>, range: ClosedRange<Double>) -> some View {
