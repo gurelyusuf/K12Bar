@@ -47,6 +47,8 @@ final class KeyboardModel {
     private var lowBattery = LowBatteryAlert()
     private var batteryTimer: Timer?
 
+    /// True once the keyboard devices could be opened (Input Monitoring granted).
+    private var opened = false
     private let defaults: UserDefaults
     /// False in unit tests, which are hosted by the app and must never touch the keyboard or `hidutil`.
     private let live: Bool
@@ -75,6 +77,7 @@ final class KeyboardModel {
         guard live else { return }
         do {
             try hid.start()
+            opened = true
         } catch HIDTransport.StartError.inputMonitoringDenied {
             error = "Allow K12Bar in System Settings > Privacy & Security > Input Monitoring, then relaunch."
         } catch {
@@ -98,7 +101,8 @@ final class KeyboardModel {
 
     /// Reads the LED zone from the keyboard. Sends read commands only.
     private func loadLighting() {
-        guard ledZone == nil, hid.hasFeatureChannel else { return }
+        // Without Input Monitoring the keyboard is listed but not open; keep that message on screen.
+        guard opened, ledZone == nil, hid.hasFeatureChannel else { return }
         do {
             let info = try session.read(.readInfo, pages: 2)
             unsupportedFirmware = Array(info[4...9]) != K12Protocol.supportedDeviceInfo
